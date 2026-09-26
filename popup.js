@@ -1,9 +1,8 @@
 const $ = (id) => document.getElementById(id);
-let tab, site, original;
+let site;
 
 async function render() {
-  const { exceptions, enabled } = await getSettings();
-  $('enabled').checked = enabled;
+  const exceptions = await getExceptions();
 
   $('list').replaceChildren(...exceptions.map((d) => {
     const li = document.createElement('li');
@@ -17,45 +16,28 @@ async function render() {
   if (!exceptions.length) $('list').innerHTML = '<li class="muted">None</li>';
 
   if (!site) return;
-  const covered = exceptions.find((e) => site === e || site.endsWith('.' + e));
+  const covered = isExcepted(site, exceptions);
   $('current').hidden = false;
   $('site').textContent = site;
   $('toggle').textContent = covered ? `Strip queries on ${covered}` : `Keep queries on ${site}`;
-  $('toggle').onclick = () => covered
-    ? setExceptions(exceptions.filter((e) => e !== covered))
-    : setExceptions([...exceptions, site]).then(restore);
-  $('restore').hidden = !(covered && original);
+  $('toggle').onclick = () => setExceptions(covered ? exceptions.filter((e) => e !== covered) : [...exceptions, site]);
 }
 
 async function setExceptions(list) {
-  await saveSettings({ exceptions: [...new Set(list)].sort() });
+  await chrome.storage.sync.set({ exceptions: [...new Set(list)].sort() });
   await render();
 }
 
-async function restore() {
-  if (original) await chrome.tabs.update(tab.id, { url: original });
-  window.close();
-}
-
-$('enabled').onchange = (e) => saveSettings({ enabled: e.target.checked });
-$('restore').onclick = restore;
 $('add').onsubmit = async (e) => {
   e.preventDefault();
   const d = siteOf('https://' + $('domain').value.trim().replace(/^https?:\/\//, ''));
   if (!d) return;
   $('domain').value = '';
-  const { exceptions } = await getSettings();
-  await setExceptions([...exceptions, d]);
+  await setExceptions([...(await getExceptions()), d]);
 };
 
 (async () => {
-  [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   site = tab && siteOf(tab.url);
-  if (site) {
-    const key = `tab${tab.id}`;
-    const saved = (await chrome.storage.session.get(key))[key];
-    // Only offer a restore when the saved URL is for this site and differs from what is loaded now.
-    if (saved && siteOf(saved) === site && saved !== tab.url) original = saved;
-  }
   render();
 })();

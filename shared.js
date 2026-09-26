@@ -1,48 +1,7 @@
 // Shared by background.js and popup.js.
 
-const DEFAULT_EXCEPTIONS = ['google.com', 'youtube.com', 'duckduckgo.com', 'bing.com'];
-
-// Login flows pass these in the URL. Stripping them would break sign-in everywhere.
-const AUTH_PARAMS = 'code|state|token|access_token|id_token|ticket|nonce|oauth_token|oauth_verifier|SAMLRequest|SAMLResponse';
-
-async function getSettings() {
-  const s = await chrome.storage.sync.get(['exceptions', 'enabled']);
-  return { exceptions: s.exceptions ?? DEFAULT_EXCEPTIONS, enabled: s.enabled ?? true };
-}
-
-async function saveSettings(patch) {
-  await chrome.storage.sync.set(patch);
-  await syncRules();
-}
-
-async function syncRules() {
-  const { exceptions, enabled } = await getSettings();
-  const page = ['main_frame'];
-  const rules = [];
-  if (enabled) {
-    rules.push({
-      id: 1, priority: 1,
-      action: { type: 'redirect', redirect: { transform: { query: '' } } },
-      condition: { regexFilter: '^https?://[^?#]*\\?', resourceTypes: page, requestMethods: ['get'] },
-    });
-    rules.push({
-      id: 2, priority: 2,
-      action: { type: 'allow' },
-      condition: { regexFilter: `[?&](${AUTH_PARAMS})=`, resourceTypes: page },
-    });
-    if (exceptions.length) {
-      rules.push({
-        id: 3, priority: 2,
-        action: { type: 'allow' },
-        condition: { requestDomains: exceptions, resourceTypes: page },
-      });
-    }
-  }
-  const old = await chrome.declarativeNetRequest.getDynamicRules();
-  await chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: old.map((r) => r.id),
-    addRules: rules,
-  });
+async function getExceptions() {
+  return (await chrome.storage.sync.get('exceptions')).exceptions ?? [];
 }
 
 function siteOf(url) {
@@ -52,4 +11,20 @@ function siteOf(url) {
   } catch {
     return null;
   }
+}
+
+function isExcepted(site, exceptions) {
+  return exceptions.find((e) => site === e || site.endsWith('.' + e));
+}
+
+// Returns the URL without its query string, or null if the text should be left alone.
+function clean(text, exceptions) {
+  const t = text.trim();
+  if (/\s/.test(t)) return null;
+  const site = siteOf(t);
+  if (!site || isExcepted(site, exceptions)) return null;
+  const u = new URL(t);
+  if (!u.search) return null;
+  u.search = '';
+  return u.href;
 }

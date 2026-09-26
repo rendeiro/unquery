@@ -1,13 +1,20 @@
 importScripts('shared.js');
 
-chrome.runtime.onInstalled.addListener(syncRules);
+async function ensureOffscreen() {
+  if (await chrome.offscreen.hasDocument()) return;
+  await chrome.offscreen.createDocument({
+    url: 'offscreen.html',
+    reasons: ['CLIPBOARD'],
+    justification: 'Watch the clipboard and strip queries from copied URLs',
+  });
+}
 
-// Remember the original URL of each tab, so the popup can restore it after you add an exception.
-chrome.webRequest.onBeforeRequest.addListener(
-  (d) => {
-    if (d.tabId >= 0 && d.url.includes('?')) chrome.storage.session.set({ [`tab${d.tabId}`]: d.url });
-  },
-  { urls: ['<all_urls>'], types: ['main_frame'] }
-);
+chrome.runtime.onInstalled.addListener(ensureOffscreen);
+chrome.runtime.onStartup.addListener(ensureOffscreen);
+ensureOffscreen();
 
-chrome.tabs.onRemoved.addListener((tabId) => chrome.storage.session.remove(`tab${tabId}`));
+// The offscreen page sends each new clipboard text here, since it can't read storage itself.
+chrome.runtime.onMessage.addListener((text, _sender, reply) => {
+  getExceptions().then((ex) => reply(clean(text, ex)));
+  return true;
+});

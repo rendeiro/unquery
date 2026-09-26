@@ -1,8 +1,8 @@
 # Unquery
 
-A tiny Chrome extension that removes the whole query string (`?utm_source=...&fbclid=...`) from every page you open. No lists of tracking parameters to maintain: everything after the `?` goes, unless you've added the site as an exception.
+A tiny Chrome extension that removes the whole query string (`?utm_source=...&fbclid=...`) from URLs you copy, so the links you share are clean. Browsing is untouched: pages load with their full URL.
 
-`https://example.com/post?utm_source=x&ref=y#top` becomes `https://example.com/post#top`
+Copy `https://example.com/post?utm_source=x&ref=y#top` and you paste `https://example.com/post#top`.
 
 ## Install
 
@@ -12,23 +12,15 @@ A tiny Chrome extension that removes the whole query string (`?utm_source=...&fb
 
 ## Use
 
-Click the icon to:
+Copy a URL the usual way (address bar, right-click "Copy link address", Cmd+C). Paste it anywhere and the query is gone.
 
-- turn it on or off
-- keep queries on the current site (it reloads the page with the original URL)
-- add or remove exceptions by hand
+Some links need their query, like `youtube.com/watch?v=...`. Click the icon to keep queries on the current site, or add and remove exceptions by hand. An exception covers its subdomains too, so `google.com` also covers `mail.google.com`.
 
-An exception covers its subdomains too, so `google.com` also covers `mail.google.com`.
+## Details
 
-## Defaults
-
-- **Exceptions:** `google.com`, `youtube.com`, `duckduckgo.com`, `bing.com`, since search and video pages need their queries. Remove them if you don't want them.
-- **Login links are left alone.** URLs carrying `code`, `state`, `token`, `ticket` and similar sign-in parameters are never touched, so logging in still works.
-- Only top-level page loads using GET are affected. Images, scripts, API calls and form posts are not.
-
-## How it works
-
-It uses Chrome's `declarativeNetRequest` to rewrite the URL before the request is sent. Nothing is logged or sent anywhere. Settings sync through your Chrome profile.
+- Only a clipboard holding just a URL is changed. Text with a URL inside it is left alone.
+- It works while Chrome is open, including for URLs copied in other apps.
+- It checks the clipboard twice a second from a hidden extension page. Nothing is logged or sent anywhere. Exceptions sync through your Chrome profile.
 
 ## License
 
